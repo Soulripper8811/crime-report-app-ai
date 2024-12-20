@@ -1,18 +1,23 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth"; // Make sure to replace this with the actual path to your auth options
 
-const prisma = new PrismaClient();
+// Prisma client singleton pattern
+const prisma = global.prisma || new PrismaClient();
+if (process.env.NODE_ENV === "development") global.prisma = prisma;
 
+// GET handler
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { reportId: string } }
 ) {
   try {
+    const { reportId } = params;
+
+    // Fetch report
     const report = await prisma.report.findUnique({
-      where: {
-        reportId: params.reportId,
-      },
+      where: { id: reportId }, // Use the correct field name for your primary key
     });
 
     if (!report) {
@@ -29,24 +34,38 @@ export async function GET(
   }
 }
 
+// PATCH handler
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { reportId: string } }
 ) {
   try {
-    const session = await getServerSession();
+    // Get the session
+    const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { reportId } = params;
+
+    // Parse request body
     const { status } = await request.json();
+    if (!status) {
+      return NextResponse.json(
+        { error: "Missing or invalid status" },
+        { status: 400 }
+      );
+    }
+
+    // Update the report
     const report = await prisma.report.update({
-      where: { id: params.id },
+      where: { id: reportId }, // Use the correct field name for your primary key
       data: { status },
     });
 
     return NextResponse.json(report);
   } catch (error) {
+    console.error("Error updating report:", error);
     return NextResponse.json(
       { error: "Error updating report" },
       { status: 500 }
