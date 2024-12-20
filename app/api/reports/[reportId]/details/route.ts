@@ -1,13 +1,12 @@
 import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth"; // Make sure to replace this with the actual path to your auth options
 
-// Prisma client singleton pattern
+// Use a singleton Prisma client for serverless environments
 const prisma = global.prisma || new PrismaClient();
 if (process.env.NODE_ENV === "development") global.prisma = prisma;
 
-// GET handler
 export async function GET(
   request: NextRequest,
   { params }: { params: { reportId: string } }
@@ -15,9 +14,17 @@ export async function GET(
   try {
     const { reportId } = params;
 
-    // Fetch report
+    // Validate the reportId
+    if (!reportId) {
+      return NextResponse.json(
+        { error: "Report ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch the report from the database
     const report = await prisma.report.findUnique({
-      where: { id: reportId }, // Use the correct field name for your primary key
+      where: { id: reportId }, // Ensure `id` matches your Prisma schema
     });
 
     if (!report) {
